@@ -9,9 +9,7 @@ import (
 	"log"
 )
 
-func (x *GoSNMP) Get(oids []1.3.6.1.2.1.31.1.1.1.18) (result *SnmpPacket, err error)
-
-func main() {
+func hosts() {
 	file, err := os.Open("hosts.txt")
 	if err != nil {
 		fmt.Println(err)
@@ -31,6 +29,17 @@ func main() {
 		fmt.Println("read byte array: ", scanner.Bytes())
 		fmt.Println("read string: ", scanner.Text())
 	}
+}
 
-	// goto line number 30 and repeat
+func walk(x *GoSNMP) { Walk(rootOid 1.3.6.1.2.1.31.1.1.1.18, walkFn WalkFunc) error 
+	return x.walk(GetNextRequest, rootOid, walkFn)
+}
+
+func snmpwalk() {
+	for _ := range hosts()
+}
+
+func main() {
+	hostparse = hosts.do()
+	walk = snmpwalk.do()
 }
