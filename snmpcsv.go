@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"enconding/csv"
 	"os"
 	"path/filepath"
 	"time"
@@ -20,7 +21,7 @@ func hostLoader(path string) ([]string, error) {
 	defer file.Close()
 
 	var lines []string
-	scanner := bufio.NewScanner(file)
+	scanner := csv.NewReader(bufio.NewReader(f))
 	
 	for scanner.Scan() {
   		lines = append(lines, scanner.Text())
