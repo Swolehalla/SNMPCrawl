@@ -21,12 +21,34 @@ func hostLoader(path string) ([]string, error) {
 
 	var lines []string
 	scanner := bufio.NewScanner(file)
+<<<<<<< HEAD
 	
 	for scanner.Scan() {
   		lines = append(lines, scanner.Text())
 	}
 
 	return lines, scanner.Err()
+=======
+	// scanner.Split(bufio.ScanLines)
+
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+
+	return lines, scanner.Err()
+
+	// Returns a boolean based on whether there's a next instance of `\n`
+	// character in the IO stream. This step also advances the internal pointer
+	// to the next position (after '\n') if it did find that token.
+	// read := scanner.Scan()
+
+	// if read {
+	// 	fmt.Println("read byte array: ", scanner.Bytes())
+	// 	fmt.Println("read bool: ", scanner.Text())
+	// }
+
+	// return read
+>>>>>>> e974ada82b14eb8ea474640cd0b87ec870abf271
 }
 
 func main() {
@@ -52,11 +74,19 @@ func main() {
 	if read_err != nil {
 		fmt.Printf("read error")
 	}
+<<<<<<< HEAD
+=======
+
+	var target = ""
+>>>>>>> e974ada82b14eb8ea474640cd0b87ec870abf271
 
 	var target = ""
 	// For each item in the array read, as host, do w/e
 	for _, host := range read {
+<<<<<<< HEAD
 		fmt.Printf(host)
+=======
+>>>>>>> e974ada82b14eb8ea474640cd0b87ec870abf271
 		target = host
 	}
 
