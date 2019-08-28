@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"enconding/csv"
+	"encoding/csv"
 	"os"
 	"path/filepath"
 	"time"
