@@ -93,8 +93,13 @@ func main() {
 			// teaching you at a whiteboard. Also, each time findHostName() is typed, a new version of the func is run and it requires ALL
 			// non-defaulted args to be passed EACH time.
 			// findHostName(arg1, arg2, arg3)
-			findHostname(op5Masterip, apiUsername, apiPassword)
-			findHostname(hostNamecurl)
+
+			// This sets the LOCAL var hostNamecurl to the return value of findHostname
+			hostNamecurl := findHostname(op5Masterip, apiUsername, apiPassword)
+
+			// findHostname(hostNamecurl)
+
+			// NOW hostNamecurl is in local scope, meaning this won't complain.
 			postServices(apiUsername, apiPassword, hostNamecurl)
 
 			err = gosnmp.Default.BulkWalk(oid, printValue)
@@ -138,13 +143,16 @@ func printValue(pdu gosnmp.SnmpPDU) error {
 
 // To accept multiple parameters, your func declaration should look something like this...
 // func findHostName(param1name param1type, param2name param2type... paramNname, paramNtype) {
-func findHostname(op5Masterip string, apiUsername string, apiPassword string) {
+func findHostname(op5Masterip string, apiUsername string, apiPassword string) string {
 	var op5Master = "https://" + op5Masterip
 	var hostNamecurl = "/api/filter/query?format=json&query=%5Bhosts%5D+address+%3D+%22" + string(gosnmp.Default.Target) + "%22&columns=name"
 
 	postServices(hostNamecurl, apiUsername, apiPassword)
 
 	fmt.Println(op5Master + hostNamecurl)
+
+	// Adding the string at the end of the func declaration allows us to return the string hostNamecurl here at the end
+	return hostNamecurl
 }
 
 func postServices(apiUsername string, apiPassword string, hostNamecurl string) {
