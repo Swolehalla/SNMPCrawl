@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/soniah/gosnmp"
 )
 
@@ -21,111 +23,134 @@ func hostLoader(path string) ([]string, error) {
 
 	var lines []string
 	scanner := bufio.NewScanner(file)
-<<<<<<< HEAD
-	
-	for scanner.Scan() {
-  		lines = append(lines, scanner.Text())
-	}
-
-	return lines, scanner.Err()
-=======
-	// scanner.Split(bufio.ScanLines)
 
 	for scanner.Scan() {
 		lines = append(lines, scanner.Text())
 	}
 
 	return lines, scanner.Err()
-
-	// Returns a boolean based on whether there's a next instance of `\n`
-	// character in the IO stream. This step also advances the internal pointer
-	// to the next position (after '\n') if it did find that token.
-	// read := scanner.Scan()
-
-	// if read {
-	// 	fmt.Println("read byte array: ", scanner.Bytes())
-	// 	fmt.Println("read bool: ", scanner.Text())
-	// }
-
-	// return read
->>>>>>> e974ada82b14eb8ea474640cd0b87ec870abf271
 }
 
 func main() {
+	// Put any global vars (barf) here
+	const oid string = "1.3.6.1.2.1.31.1.1.1.18"
+
 	flag.Usage = func() {
 		fmt.Printf("Usage:\n")
 		fmt.Printf("   %s [-community=<community>] /n", filepath.Base(os.Args[0]))
+		fmt.Printf("     op5Masterip      - ip of the monitor server\n")
 		flag.PrintDefaults()
 	}
 
 	var community string
 	flag.StringVar(&community, "community", "public", "the community string for device")
 
-	flag.Parse()
+	var op5Masterip string
+	flag.StringVar(&op5Masterip, "op5Masterip", "", "Ip address of Monitor Master IP")
 
-	if len(flag.Args()) < 1 {
-		flag.Usage()
-		os.Exit(1)
-	}
+	var apiUsername string
+	flag.StringVar(&apiUsername, "apiUsername", "", "OP5 Username for api calls")
+
+	var apiPassword string
+	flag.StringVar(&apiPassword, "apiPassword", "", "Password for OP5 User")
+
+	// Consider adding OPTIONAL flags for quiet and ignore empty alias
+
+	// Feeds community CLI flag to var
+	flag.Parse()
 
 	// Sets the value of the main() scope variable read to the return value of hostLoader
 	read, read_err := hostLoader("hosts.txt")
 
 	if read_err != nil {
-		fmt.Printf("read error")
+		err := color.New(color.FgRed)
+		err.Println("read error, panicing...")
+		os.Exit(1)
 	}
-<<<<<<< HEAD
-=======
 
-	var target = ""
->>>>>>> e974ada82b14eb8ea474640cd0b87ec870abf271
-
-	var target = ""
 	// For each item in the array read, as host, do w/e
 	for _, host := range read {
-<<<<<<< HEAD
-		fmt.Printf(host)
-=======
->>>>>>> e974ada82b14eb8ea474640cd0b87ec870abf271
-		target = host
-	}
+		if host != "" && host != " " {
+			fmt.Println(host)
 
-	var oid string = "1.3.6.1.2.1.31.1.1.1.18"
+			gosnmp.Default.Target = host
+			gosnmp.Default.Community = community
+			gosnmp.Default.Timeout = time.Duration(5 * time.Second) // Timeout better suited to walking
 
-	if len(flag.Args()) > 1 {
-		oid = flag.Args()[1]
-	}
+			fmt.Println(gosnmp.Default.Community)
 
-	gosnmp.Default.Target = target
-	gosnmp.Default.Community = community
-	gosnmp.Default.Timeout = time.Duration(10 * time.Second) // Timeout better suited to walking
+			err := gosnmp.Default.Connect()
+			defer gosnmp.Default.Conn.Close()
 
-	err := gosnmp.Default.Connect()
+			if err != nil {
+				err_red := color.New(color.FgRed)
+				err_red.Printf("Connect err: %v\n", err)
+				os.Exit(1)
+			}
 
-	if err != nil {
-		fmt.Printf("Connect err: %v\n", err)
-		os.Exit(1)
-	}
-	defer gosnmp.Default.Conn.Close()
+			// To pass multiple arguments to a func, your call should look something like this
+			// Please note that the order by which args are passed in DOES matter. To make it not matter would require some time of me
+			// teaching you at a whiteboard. Also, each time findHostName() is typed, a new version of the func is run and it requires ALL
+			// non-defaulted args to be passed EACH time.
+			// findHostName(arg1, arg2, arg3)
+			findHostname(op5Masterip, apiUsername, apiPassword)
+			findHostname(hostNamecurl)
+			postServices(apiUsername, apiPassword, hostNamecurl)
 
-	err = gosnmp.Default.BulkWalk(oid, printValue)
+			err = gosnmp.Default.BulkWalk(oid, printValue)
 
-	if err != nil {
-		fmt.Printf("Walk Error: %v\n", err)
-		os.Exit(1)
+			if err != nil {
+				err_red := color.New(color.FgRed)
+				err_red.Printf("Walk Error: %v\n", err)
+				os.Exit(1)
+			}
+		} else {
+			err := color.New(color.FgRed)
+			err.Println("Empty host, skipping...")
+		}
 	}
 }
 
+// FYI it's best practice for all functions to be delineated BEFORE main. Obviously, go compiler doesn't care but it's usual to at least have a prototype before main
 func printValue(pdu gosnmp.SnmpPDU) error {
-	fmt.Printf("%s = ", pdu.Name)
-
 	switch pdu.Type {
 	case gosnmp.OctetString:
-		b := pdu.Value.([]byte)
-		fmt.Printf("STRING: %s\n", string(b))
-	default:
-		fmt.Printf("TYPE %d: %d\n", pdu.Type, gosnmp.ToBigInt(pdu.Value))
+		var if_num = strings.Split(pdu.Name, ".")
+		var if_num_bit = if_num[len(if_num)-1]
+		var if_num_curl = "if_num " + string(if_num_bit)
+
+		fmt.Println(if_num_curl + " - ")
+
+		snmp_port_alias := string(pdu.Value.([]byte))
+
+		if snmp_port_alias != "" {
+			fmt.Println("port_alias " + snmp_port_alias)
+		} else {
+			err := color.New(color.FgRed)
+			err.Println("!Warning! alias was empty, continuing...")
+		}
+		// default:
+		// 	fmt.Printf("TYPE %d: %d\n", pdu.Type, gosnmp.ToBigInt(pdu.Value))
 	}
 
 	return nil
+}
+
+// To accept multiple parameters, your func declaration should look something like this...
+// func findHostName(param1name param1type, param2name param2type... paramNname, paramNtype) {
+func findHostname(op5Masterip string, apiUsername string, apiPassword string) {
+	var op5Master = "https://" + op5Masterip
+	var hostNamecurl = "/api/filter/query?format=json&query=%5Bhosts%5D+address+%3D+%22" + string(gosnmp.Default.Target) + "%22&columns=name"
+
+	postServices(hostNamecurl, apiUsername, apiPassword)
+
+	fmt.Println(op5Master + hostNamecurl)
+}
+
+func postServices(apiUsername string, apiPassword string, hostNamecurl string) {
+	//	curl -H 'content-type: application/json' -d  '{"host_name":"rnc04-ra008","service_description":"IF 8_ gre Traffic","check_command":"check_traffic_bps_v2","check_command_args":"'n3gT1vGh057r1d3r'!8!70!90","stalking_options":["n"],"template":"default-service","register":true,"file_id":"etc\/services.cfg","is_volatile":false,"max_check_attempts":3,"check_interval":1,"retry_interval":1,"active_checks_enabled":true,"passive_checks_enabled":true,"check_period":"24x7","parallelize_check":true,"obsess":false,"check_freshness":false,"event_handler_enabled":true,"flap_detection_enabled":true,"process_perf_data":true,"retain_status_information":true,"retain_nonstatus_information":true,"notification_interval":0,"notification_period":"24x7","notification_options":["c","f","r","s","u","w"],"notifications_enabled":true,"hostgroup_name":"","display_name":"","servicegroups":[],"freshness_threshold":"","event_handler":"","event_handler_args":"","low_flap_threshold":"","high_flap_threshold":"","flap_detection_options":[],"first_notification_delay":"","contacts":[],"contact_groups":[],"notes":"","notes_url":"","action_url":"","icon_image":"","icon_image_alt":"","obsess_over_service":false}' 'https://10.128.255.4/api/config/service' -u 'administrator:OP5POC'
+	//	curl -H 'content-type: application/json' -d  '{"host_name":"rnc04-ra008","service_description":"IF 8_ gre Errors","check_command":"check_snmpif_errors_v2","check_command_args":"'n3gT1vGh057r1d3r'!8!1.5!2.5","stalking_options":["n"],"template":"default-service","register":true,"file_id":"etc\/services.cfg","is_volatile":false,"max_check_attempts":3,"check_interval":1,"retry_interval":1,"active_checks_enabled":true,"passive_checks_enabled":true,"check_period":"24x7","parallelize_check":true,"obsess":false,"check_freshness":false,"event_handler_enabled":true,"flap_detection_enabled":true,"process_perf_data":true,"retain_status_information":true,"retain_nonstatus_information":true,"notification_interval":0,"notification_period":"24x7","notification_options":["c","f","r","s","u","w"],"notifications_enabled":true,"hostgroup_name":"","display_name":"","servicegroups":[],"freshness_threshold":"","event_handler":"","event_handler_args":"","low_flap_threshold":"","high_flap_threshold":"","flap_detection_options":[],"first_notification_delay":"","contacts":[],"contact_groups":[],"notes":"","notes_url":"","action_url":"","icon_image":"","icon_image_alt":"","obsess_over_service":false}' 'https://10.128.255.4/api/config/service' -u 'administrator:OP5POC'
+	//	curl -H 'content-type: application/json' -d '{"host_name":"rnc04-ra008","service_description":"IF 8_ gre Status","check_command":"check_snmpif_status_v2","check_command_args":"'n3gT1vGh057r1d3r'!8!c","stalking_options":["n"],"template":"default-service","register":true,"file_id":"etc\/services.cfg","is_volatile":false,"max_check_attempts":3,"check_interval":1,"retry_interval":1,"active_checks_enabled":true,"passive_checks_enabled":true,"check_period":"24x7","parallelize_check":true,"obsess":false,"check_freshness":false,"event_handler_enabled":true,"flap_detection_enabled":true,"process_perf_data":true,"retain_status_information":true,"retain_nonstatus_information":true,"notification_interval":0,"notification_period":"24x7","notification_options":["c","f","r","s","u","w"],"notifications_enabled":true,"hostgroup_name":"","display_name":"","servicegroups":[],"freshness_threshold":"","event_handler":"","event_handler_args":"","low_flap_threshold":"","high_flap_threshold":"","flap_detection_options":[],"first_notification_delay":"","contacts":[],"contact_groups":[],"notes":"","notes_url":"","action_url":"","icon_image":"","icon_image_alt":"","obsess_over_service":false}' 'https://10.128.255.4/api/config/service' -u 'administrator:OP5POC'
+
+	// you might consider making this function return a bool that tells you if all the data was posted correctly or not
 }

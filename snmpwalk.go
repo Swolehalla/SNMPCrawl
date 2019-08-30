@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/soniah/gosnmp"
@@ -52,7 +53,8 @@ func main() {
 }
 
 func printValue(pdu gosnmp.SnmpPDU) error {
-	fmt.Printf("%s = ", pdu.Name)
+	var if_num = strings.Split(pdu.Name, ".")
+	fmt.Printf("IF_Num %s: ", if_num[len(if_num)-1])
 
 	switch pdu.Type {
 	case gosnmp.OctetString:
