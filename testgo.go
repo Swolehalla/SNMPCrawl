@@ -2,14 +2,16 @@ package main
 
 import (
 	"bufio"
+	"crypto/tls"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
-	"net/http"
-    "io/ioutil"
 
 	"github.com/fatih/color"
 	"github.com/soniah/gosnmp"
@@ -21,9 +23,11 @@ func hostLoader(path string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	defer file.Close()
 
 	var lines []string
+
 	scanner := bufio.NewScanner(file)
 
 	for scanner.Scan() {
@@ -97,12 +101,13 @@ func main() {
 			// findHostName(arg1, arg2, arg3)
 
 			// This sets the LOCAL var hostNamecurl to the return value of findHostname
-			hostNamecurl := findHostname(op5Masterip, apiUsername, apiPassword)
+			// hostNamecurlResult := findHostname(op5Masterip, apiUsername, apiPassword)
+			findHostname(op5Masterip, apiUsername, apiPassword)
 
 			// findHostname(hostNamecurl)
 
 			// NOW hostNamecurl is in local scope, meaning this won't complain.
-			postServices(apiUsername, apiPassword, hostNamecurl)
+			// hostNamecurl(apiUsername, apiPassword, hostNamecurlResult)
 
 			err = gosnmp.Default.BulkWalk(oid, printValue)
 
@@ -143,34 +148,46 @@ func printValue(pdu gosnmp.SnmpPDU) error {
 	return nil
 }
 
+type op5API struct {
+	Name string `json:"name"`
+}
+
 // To accept multiple parameters, your func declaration should look something like this...
 // func findHostName(param1name param1type, param2name param2type... paramNname, paramNtype) {
-func postServices(op5Masterip string, apiUsername string, apiPassword string) string {
-	var op5Master = "https://" + op5Masterip
-	var hostNamecurl = "/api/filter/query?format=json&query=%5Bhosts%5D+address+%3D+%22" + string(gosnmp.Default.Target) + "%22&columns=name"
+func findHostname(op5Masterip string, apiUsername string, apiPassword string) string {
+	var apiURL = "https://" + op5Masterip + "/api/filter/query?format=json&query=%5Bhosts%5D+address+%3D+%22" + string(gosnmp.Default.Target) + "%22&columns=name"
+	var fullCurlCmd = "curl -X GET -H 'content-type: application/json' -k '" + apiURL + "' -u '" + apiUsername + ":" + apiPassword + "'"
+	var data []interface{}
+	// var header = "content-type: application/json"
 
-	postServices(hostNamecurl, apiUsername, apiPassword)
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 
-	fmt.Println(op5Master + hostNamecurl)
+	request, err := http.NewRequest("GET", apiURL, nil)
+	request.SetBasicAuth(apiUsername, apiPassword)
+	client := &http.Client{}
+	response, err := client.Do(request)
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		fmt.Println("%s", err)
+		os.Exit(1)
+	}
+
+	err = json.Unmarshal(body, &data)
+
+	if err != nil {
+		fmt.Printf("There was an error decoding the json. err = %s", err)
+	}
+
+	fmt.Println(string(body))
+	fmt.Println(data)
+	// fmt.Println(fullCurlCmd)
 
 	// Adding the string at the end of the func declaration allows us to return the string hostNamecurl here at the end
-	return hostNamecurl
+	return fullCurlCmd
 }
 
-func findHostname(apiUsername string, apiPassword string, hostNamecurl string) {
-		auth := apiUsername + ":" + apiPassword
-		url := "https://" + op5Masterip + "/api/filter/query?format=json&query= [hosts] address = 172.27.210.10&columns=name"
-		req, _ := http.NewRequest("GET", url, nil)
-		req.Header.Add("authorization", "Basic " + auth(apiUsername,apiPassword)
-		res, _ := http.DefaultClient.Do(req)
-		defer res.Body.Close()
-		body, _ := ioutil.ReadAll(res.Body)
-		fmt.Println(res)
-		fmt.Println(string(body))
-	}
-	//	curl -H 'content-type: application/json' -d  '{"host_name":"rnc04-ra008","service_description":"IF 8_ gre Traffic","check_command":"check_traffic_bps_v2","check_command_args":"'n3gT1vGh057r1d3r'!8!70!90","stalking_options":["n"],"template":"default-service","register":true,"file_id":"etc\/services.cfg","is_volatile":false,"max_check_attempts":3,"check_interval":1,"retry_interval":1,"active_checks_enabled":true,"passive_checks_enabled":true,"check_period":"24x7","parallelize_check":true,"obsess":false,"check_freshness":false,"event_handler_enabled":true,"flap_detection_enabled":true,"process_perf_data":true,"retain_status_information":true,"retain_nonstatus_information":true,"notification_interval":0,"notification_period":"24x7","notification_options":["c","f","r","s","u","w"],"notifications_enabled":true,"hostgroup_name":"","display_name":"","servicegroups":[],"freshness_threshold":"","event_handler":"","event_handler_args":"","low_flap_threshold":"","high_flap_threshold":"","flap_detection_options":[],"first_notification_delay":"","contacts":[],"contact_groups":[],"notes":"","notes_url":"","action_url":"","icon_image":"","icon_image_alt":"","obsess_over_service":false}' 'https://10.128.255.4/api/config/service' -u 'administrator:OP5POC'
-	//	curl -H 'content-type: application/json' -d  '{"host_name":"rnc04-ra008","service_description":"IF 8_ gre Errors","check_command":"check_snmpif_errors_v2","check_command_args":"'n3gT1vGh057r1d3r'!8!1.5!2.5","stalking_options":["n"],"template":"default-service","register":true,"file_id":"etc\/services.cfg","is_volatile":false,"max_check_attempts":3,"check_interval":1,"retry_interval":1,"active_checks_enabled":true,"passive_checks_enabled":true,"check_period":"24x7","parallelize_check":true,"obsess":false,"check_freshness":false,"event_handler_enabled":true,"flap_detection_enabled":true,"process_perf_data":true,"retain_status_information":true,"retain_nonstatus_information":true,"notification_interval":0,"notification_period":"24x7","notification_options":["c","f","r","s","u","w"],"notifications_enabled":true,"hostgroup_name":"","display_name":"","servicegroups":[],"freshness_threshold":"","event_handler":"","event_handler_args":"","low_flap_threshold":"","high_flap_threshold":"","flap_detection_options":[],"first_notification_delay":"","contacts":[],"contact_groups":[],"notes":"","notes_url":"","action_url":"","icon_image":"","icon_image_alt":"","obsess_over_service":false}' 'https://10.128.255.4/api/config/service' -u 'administrator:OP5POC'
-	//	curl -H 'content-type: application/json' -d '{"host_name":"rnc04-ra008","service_description":"IF 8_ gre Status","check_command":"check_snmpif_status_v2","check_command_args":"'n3gT1vGh057r1d3r'!8!c","stalking_options":["n"],"template":"default-service","register":true,"file_id":"etc\/services.cfg","is_volatile":false,"max_check_attempts":3,"check_interval":1,"retry_interval":1,"active_checks_enabled":true,"passive_checks_enabled":true,"check_period":"24x7","parallelize_check":true,"obsess":false,"check_freshness":false,"event_handler_enabled":true,"flap_detection_enabled":true,"process_perf_data":true,"retain_status_information":true,"retain_nonstatus_information":true,"notification_interval":0,"notification_period":"24x7","notification_options":["c","f","r","s","u","w"],"notifications_enabled":true,"hostgroup_name":"","display_name":"","servicegroups":[],"freshness_threshold":"","event_handler":"","event_handler_args":"","low_flap_threshold":"","high_flap_threshold":"","flap_detection_options":[],"first_notification_delay":"","contacts":[],"contact_groups":[],"notes":"","notes_url":"","action_url":"","icon_image":"","icon_image_alt":"","obsess_over_service":false}' 'https://10.128.255.4/api/config/service' -u 'administrator:OP5POC'
+//	curl -H 'content-type: application/json' -d  '{"host_name":"rnc04-ra008","service_description":"IF 8_ gre Traffic","check_command":"check_traffic_bps_v2","check_command_args":"'n3gT1vGh057r1d3r'!8!70!90","stalking_options":["n"],"template":"default-service","register":true,"file_id":"etc\/services.cfg","is_volatile":false,"max_check_attempts":3,"check_interval":1,"retry_interval":1,"active_checks_enabled":true,"passive_checks_enabled":true,"check_period":"24x7","parallelize_check":true,"obsess":false,"check_freshness":false,"event_handler_enabled":true,"flap_detection_enabled":true,"process_perf_data":true,"retain_status_information":true,"retain_nonstatus_information":true,"notification_interval":0,"notification_period":"24x7","notification_options":["c","f","r","s","u","w"],"notifications_enabled":true,"hostgroup_name":"","display_name":"","servicegroups":[],"freshness_threshold":"","event_handler":"","event_handler_args":"","low_flap_threshold":"","high_flap_threshold":"","flap_detection_options":[],"first_notification_delay":"","contacts":[],"contact_groups":[],"notes":"","notes_url":"","action_url":"","icon_image":"","icon_image_alt":"","obsess_over_service":false}' 'https://10.128.255.4/api/config/service' -u 'administrator:OP5POC'
+//	curl -H 'content-type: application/json' -d  '{"host_name":"rnc04-ra008","service_description":"IF 8_ gre Errors","check_command":"check_snmpif_errors_v2","check_command_args":"'n3gT1vGh057r1d3r'!8!1.5!2.5","stalking_options":["n"],"template":"default-service","register":true,"file_id":"etc\/services.cfg","is_volatile":false,"max_check_attempts":3,"check_interval":1,"retry_interval":1,"active_checks_enabled":true,"passive_checks_enabled":true,"check_period":"24x7","parallelize_check":true,"obsess":false,"check_freshness":false,"event_handler_enabled":true,"flap_detection_enabled":true,"process_perf_data":true,"retain_status_information":true,"retain_nonstatus_information":true,"notification_interval":0,"notification_period":"24x7","notification_options":["c","f","r","s","u","w"],"notifications_enabled":true,"hostgroup_name":"","display_name":"","servicegroups":[],"freshness_threshold":"","event_handler":"","event_handler_args":"","low_flap_threshold":"","high_flap_threshold":"","flap_detection_options":[],"first_notification_delay":"","contacts":[],"contact_groups":[],"notes":"","notes_url":"","action_url":"","icon_image":"","icon_image_alt":"","obsess_over_service":false}' 'https://10.128.255.4/api/config/service' -u 'administrator:OP5POC'
+//	curl -H 'content-type: application/json' -d '{"host_name":"rnc04-ra008","service_description":"IF 8_ gre Status","check_command":"check_snmpif_status_v2","check_command_args":"'n3gT1vGh057r1d3r'!8!c","stalking_options":["n"],"template":"default-service","register":true,"file_id":"etc\/services.cfg","is_volatile":false,"max_check_attempts":3,"check_interval":1,"retry_interval":1,"active_checks_enabled":true,"passive_checks_enabled":true,"check_period":"24x7","parallelize_check":true,"obsess":false,"check_freshness":false,"event_handler_enabled":true,"flap_detection_enabled":true,"process_perf_data":true,"retain_status_information":true,"retain_nonstatus_information":true,"notification_interval":0,"notification_period":"24x7","notification_options":["c","f","r","s","u","w"],"notifications_enabled":true,"hostgroup_name":"","display_name":"","servicegroups":[],"freshness_threshold":"","event_handler":"","event_handler_args":"","low_flap_threshold":"","high_flap_threshold":"","flap_detection_options":[],"first_notification_delay":"","contacts":[],"contact_groups":[],"notes":"","notes_url":"","action_url":"","icon_image":"","icon_image_alt":"","obsess_over_service":false}' 'https://10.128.255.4/api/config/service' -u 'administrator:OP5POC'
 
-	// you might consider making this function return a bool that tells you if all the data was posted correctly or not
-}
+// you might consider making this function return a bool that tells you if all the data was posted correctly or not
