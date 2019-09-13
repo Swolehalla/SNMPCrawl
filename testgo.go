@@ -172,14 +172,19 @@ func findHostname(op5Masterip string, apiUsername string, apiPassword string) st
 		os.Exit(1)
 	}
 
-	err = json.Unmarshal(body, &data)
+	var hostAlias []op5API
+
+	err = json.Unmarshal([]byte(body), &hostAlias)
 
 	if err != nil {
 		fmt.Printf("There was an error decoding the json. err = %s", err)
 	}
 
-	fmt.Println(string(body))
+	hostname := hostAlias[0].Name
+	
+	//fmt.Println(resp.Name)
 	fmt.Println(data)
+	fmt.Println(hostname)
 	// fmt.Println(fullCurlCmd)
 
 	// Adding the string at the end of the func declaration allows us to return the string hostNamecurl here at the end
