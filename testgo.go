@@ -156,7 +156,7 @@ type op5API struct {
 // func findHostName(param1name param1type, param2name param2type... paramNname, paramNtype) {
 func findHostname(op5Masterip string, apiUsername string, apiPassword string) string {
 	var apiURL = "https://" + op5Masterip + "/api/filter/query?format=json&query=%5Bhosts%5D+address+%3D+%22" + string(gosnmp.Default.Target) + "%22&columns=name"
-	var fullCurlCmd = "curl -X GET -H 'content-type: application/json' -k '" + apiURL + "' -u '" + apiUsername + ":" + apiPassword + "'"
+//	var fullCurlCmd = "curl -X GET -H 'content-type: application/json' -k '" + apiURL + "' -u '" + apiUsername + ":" + apiPassword + "'"
 	var data []interface{}
 	// var header = "content-type: application/json"
 
@@ -188,8 +188,47 @@ func findHostname(op5Masterip string, apiUsername string, apiPassword string) st
 	// fmt.Println(fullCurlCmd)
 
 	// Adding the string at the end of the func declaration allows us to return the string hostNamecurl here at the end
-	return fullCurlCmd
+	return hostname
 }
+
+type Payload struct {
+	HostName                   string        `json:"host_name"`
+	ServiceDescription         string        `json:"service_description"`
+	CheckCommandArgs           string        `json:"check_command_args"`
+	CheckCommand               string        `json:"check_command"`
+	Template                   string        `json:"template"`
+}
+
+func postService(op5Masterip string, apiUsername string, apiPassword string, hostname string, community string, if_num_curl string, if_num_bit string){
+	
+	data := Payload{
+		HostName: hostname,
+		ServiceDescription: if_num_curl + if_num_bit,
+		CheckCommandArgs: community,
+		CheckCommand: "check_traffic_bps_v2",
+	}
+	payloadBytes, err := json.Marshal(data)
+	if err != nil {
+	// handle err
+	}
+
+	body = payloadBytes.NewReader(payloadBytes)
+	fmt.Println(body)
+	req, err := http.NewRequest("POST", "https://" +  op5Masterip +"/api/config/service", body)
+	if err != nil {
+	// handle err
+	}
+	req.SetBasicAuth(apiUsername, apiPassword)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+	// handle err
+	}
+	defer resp.Body.Close()
+	fmt.Println(req)
+}
+
 
 //	curl -H 'content-type: application/json' -d  '{"host_name":"rnc04-ra008","service_description":"IF 8_ gre Traffic","check_command":"check_traffic_bps_v2","check_command_args":"'n3gT1vGh057r1d3r'!8!70!90","stalking_options":["n"],"template":"default-service","register":true,"file_id":"etc\/services.cfg","is_volatile":false,"max_check_attempts":3,"check_interval":1,"retry_interval":1,"active_checks_enabled":true,"passive_checks_enabled":true,"check_period":"24x7","parallelize_check":true,"obsess":false,"check_freshness":false,"event_handler_enabled":true,"flap_detection_enabled":true,"process_perf_data":true,"retain_status_information":true,"retain_nonstatus_information":true,"notification_interval":0,"notification_period":"24x7","notification_options":["c","f","r","s","u","w"],"notifications_enabled":true,"hostgroup_name":"","display_name":"","servicegroups":[],"freshness_threshold":"","event_handler":"","event_handler_args":"","low_flap_threshold":"","high_flap_threshold":"","flap_detection_options":[],"first_notification_delay":"","contacts":[],"contact_groups":[],"notes":"","notes_url":"","action_url":"","icon_image":"","icon_image_alt":"","obsess_over_service":false}' 'https://10.128.255.4/api/config/service' -u 'administrator:OP5POC'
 //	curl -H 'content-type: application/json' -d  '{"host_name":"rnc04-ra008","service_description":"IF 8_ gre Errors","check_command":"check_snmpif_errors_v2","check_command_args":"'n3gT1vGh057r1d3r'!8!1.5!2.5","stalking_options":["n"],"template":"default-service","register":true,"file_id":"etc\/services.cfg","is_volatile":false,"max_check_attempts":3,"check_interval":1,"retry_interval":1,"active_checks_enabled":true,"passive_checks_enabled":true,"check_period":"24x7","parallelize_check":true,"obsess":false,"check_freshness":false,"event_handler_enabled":true,"flap_detection_enabled":true,"process_perf_data":true,"retain_status_information":true,"retain_nonstatus_information":true,"notification_interval":0,"notification_period":"24x7","notification_options":["c","f","r","s","u","w"],"notifications_enabled":true,"hostgroup_name":"","display_name":"","servicegroups":[],"freshness_threshold":"","event_handler":"","event_handler_args":"","low_flap_threshold":"","high_flap_threshold":"","flap_detection_options":[],"first_notification_delay":"","contacts":[],"contact_groups":[],"notes":"","notes_url":"","action_url":"","icon_image":"","icon_image_alt":"","obsess_over_service":false}' 'https://10.128.255.4/api/config/service' -u 'administrator:OP5POC'
