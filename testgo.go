@@ -26,6 +26,8 @@ type snmpData struct {
 	hostname			string
 	community			string
 	if_num_curl			string
+	snmp_port_alias		string
+	if_num_bit	string
 }
 
 func hostLoader(path string) ([]string, error) {
@@ -138,16 +140,19 @@ func printValue(pdu gosnmp.SnmpPDU) error {
 	switch pdu.Type {
 	case gosnmp.OctetString:
 		var if_num = strings.Split(pdu.Name, ".")
-		var if_num_bit = if_num[len(if_num)-1]
-		var if_num_curl = "if_num " + string(if_num_bit)
-		snmp_port_alias := string(pdu.Value.([]byte))
-		snmpRun.if_num_curl = if_num_curl + "-" + snmp_port_alias
+		snmpRun.if_num_bit = if_num[len(if_num)-1]
+		var if_num_curl = "if_num " + string(snmpRun.if_num_bit)
+		snmpRun.snmp_port_alias = string(pdu.Value.([]byte))
+		snmpRun.if_num_curl = if_num_curl + "-" + snmpRun.snmp_port_alias
 
-		//fmt.Println(if_num_curl + " - ")
+		//fmt.Printf("%T\n", if_num_bit)
 
-		if snmp_port_alias != "" {
-			 //fmt.Println("port_alias " + snmp_port_alias)
+
+		if snmpRun.snmp_port_alias != "" {
+			 fmt.Println(snmpRun.snmp_port_alias)
 			postService(snmpRun)
+			postServiceErrors(snmpRun)
+			postServicestatus(snmpRun)
 		} else {
 			err := color.New(color.FgRed)
 			err.Println("!Warning! alias was empty, continuing...")
@@ -210,10 +215,10 @@ func postService(snmpBlock snmpData) {
 
 	data := Payload{
 		HostName:           snmpBlock.hostname,
-		ServiceDescription: snmpBlock.if_num_curl + "traffic",
-		CheckCommandArgs:   snmpBlock.community,
+		ServiceDescription: snmpBlock.if_num_curl + " traffic",
+		CheckCommandArgs:   snmpBlock.community + "!" + snmpRun.if_num_bit + "!80" + "!90",
 		CheckCommand:       "check_traffic_bps_v2",
-		Template:            "default",
+		Template:            "default-service",
 	}
 	payloadBytes, err := json.Marshal(data)
 	if err != nil {
@@ -229,22 +234,96 @@ func postService(snmpBlock snmpData) {
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	
 	req, err := http.NewRequest("POST", "https://" + snmpBlock.op5Masterip + "/api/config/service", body)
+	if err != nil {
+		// handle err
+	}
 	req.SetBasicAuth(snmpBlock.apiUsername, snmpBlock.apiPassword)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	
-	if err != nil {
-		panic(err)
-	}
+	resp, err := http.DefaultClient.Do(req)
+if err != nil {
+	// handle err
+}
 	defer resp.Body.Close()
 
 	fmt.Println("response Status:", resp.Status)
-	fmt.Println(data)
-	fmt.Println(req)
-	fmt.Println("response Headers:", resp.Header)
-	fmt.Println("")
+}
+
+func postServiceErrors(snmpBlock snmpData) {
+
+	data := Payload{
+		HostName:           snmpBlock.hostname,
+		ServiceDescription: snmpBlock.if_num_curl + " Interface Errors",
+		CheckCommandArgs:   snmpBlock.community + "!" + snmpRun.if_num_bit + "!1.5" + "!2.5",
+		CheckCommand:       "check_snmpif_errors_v2",
+		Template:            "default-service",
+	}
+	payloadBytes, err := json.Marshal(data)
+	if err != nil {
+		// handle err
+	}
+
+	//hostMap := make(map[string]map[string]map[string]map[string]map[string]Payload, data)
+		
+	fmt.Println(string(payloadBytes))
+
+	body := bytes.NewReader(payloadBytes)
+	// fmt.Println(body)
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	
+	req, err := http.NewRequest("POST", "https://" + snmpBlock.op5Masterip + "/api/config/service", body)
+	if err != nil {
+		// handle err
+	}
+	req.SetBasicAuth(snmpBlock.apiUsername, snmpBlock.apiPassword)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+if err != nil {
+	// handle err
+}
+	defer resp.Body.Close()
+
+	fmt.Println("response Status:", resp.Status)
+}
+
+
+func postServicestatus(snmpBlock snmpData) {
+
+	data := Payload{
+		HostName:           snmpBlock.hostname,
+		ServiceDescription: snmpBlock.if_num_curl + " Port Status",
+		CheckCommandArgs:   snmpBlock.community + "!" + snmpRun.if_num_bit + "!c",
+		CheckCommand:       "check_snmpif_status_v2",
+		Template:            "default-service",
+	}
+	payloadBytes, err := json.Marshal(data)
+	if err != nil {
+		// handle err
+	}
+
+	//hostMap := make(map[string]map[string]map[string]map[string]map[string]Payload, data)
+		
+	fmt.Println(string(payloadBytes))
+
+	body := bytes.NewReader(payloadBytes)
+	// fmt.Println(body)
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	
+	req, err := http.NewRequest("POST", "https://" + snmpBlock.op5Masterip + "/api/config/service", body)
+	if err != nil {
+		// handle err
+	}
+	req.SetBasicAuth(snmpBlock.apiUsername, snmpBlock.apiPassword)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+if err != nil {
+	// handle err
+}
+	defer resp.Body.Close()
+
+	fmt.Println("response Status:", resp.Status)
 }
 
 //	curl -H 'content-type: application/json' -d  '{"host_name":"rnc04-ra008","service_description":"IF 8_ gre Traffic","check_command":"check_traffic_bps_v2","check_command_args":"'n3gT1vGh057r1d3r'!8!70!90","stalking_options":["n"],"template":"default-service","register":true,"file_id":"etc\/services.cfg","is_volatile":false,"max_check_attempts":3,"check_interval":1,"retry_interval":1,"active_checks_enabled":true,"passive_checks_enabled":true,"check_period":"24x7","parallelize_check":true,"obsess":false,"check_freshness":false,"event_handler_enabled":true,"flap_detection_enabled":true,"process_perf_data":true,"retain_status_information":true,"retain_nonstatus_information":true,"notification_interval":0,"notification_period":"24x7","notification_options":["c","f","r","s","u","w"],"notifications_enabled":true,"hostgroup_name":"","display_name":"","servicegroups":[],"freshness_threshold":"","event_handler":"","event_handler_args":"","low_flap_threshold":"","high_flap_threshold":"","flap_detection_options":[],"first_notification_delay":"","contacts":[],"contact_groups":[],"notes":"","notes_url":"","action_url":"","icon_image":"","icon_image_alt":"","obsess_over_service":false}' 'https://10.128.255.4/api/config/service' -u 'administrator:OP5POC'
@@ -252,4 +331,9 @@ func postService(snmpBlock snmpData) {
 //	curl -H 'content-type: application/json' -d '{"host_name":"rnc04-ra008","service_description":"IF 8_ gre Status","check_command":"check_snmpif_status_v2","check_command_args":"'n3gT1vGh057r1d3r'!8!c","stalking_options":["n"],"template":"default-service","register":true,"file_id":"etc\/services.cfg","is_volatile":false,"max_check_attempts":3,"check_interval":1,"retry_interval":1,"active_checks_enabled":true,"passive_checks_enabled":true,"check_period":"24x7","parallelize_check":true,"obsess":false,"check_freshness":false,"event_handler_enabled":true,"flap_detection_enabled":true,"process_perf_data":true,"retain_status_information":true,"retain_nonstatus_information":true,"notification_interval":0,"notification_period":"24x7","notification_options":["c","f","r","s","u","w"],"notifications_enabled":true,"hostgroup_name":"","display_name":"","servicegroups":[],"freshness_threshold":"","event_handler":"","event_handler_args":"","low_flap_threshold":"","high_flap_threshold":"","flap_detection_options":[],"first_notification_delay":"","contacts":[],"contact_groups":[],"notes":"","notes_url":"","action_url":"","icon_image":"","icon_image_alt":"","obsess_over_service":false}' 'https://10.128.255.4/api/config/service' -u 'administrator:OP5POC'
 
 // you might consider making this function return a bool that tells you if all the data was posted correctly or not
+
+
+//curl -H -k 'content-type: application/json' -d '{"host_name":"16Port10GBCoreSwitch","service_description":"if_num 16-Port 16traffic","check_command_args":"op5","check_command":"check_traffic_bps_v2","template":"default"}' 'https://172.27.150.170/api/config/service' -u 'administrator:OP5POC'
+
+//{"host_name":"16Port10GBCoreSwitch","service_description":"if_num 16-Port 16traffic","check_command_args":"op5","check_command":"check_traffic_bps_v2","template":"default"}
 
