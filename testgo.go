@@ -7,27 +7,27 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/fatih/color"
+	"github.com/soniah/gosnmp"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
-	"github.com/fatih/color"
-	"github.com/soniah/gosnmp"
 )
 
 type snmpData struct {
-	op5Masterip			string
-	apiUsername			string
-	apiPassword			string
-	hostname			string
-	community			string
-	if_num_curl			string
-	snmp_port_alias		string
-	if_num_bit			string
-	postCount			int
-	commit				bool
+	op5MasterIP   string
+	apiUsername   string
+	apiPassword   string
+	hostname      string
+	community     string
+	ifNumCurl     string
+	snmpPortAlias string
+	ifNumBit      string
+	postCount     int
+	commit        bool
 }
 
 type Payload struct {
@@ -62,16 +62,16 @@ var snmpRun snmpData
 
 func main() {
 	const oid string = "1.3.6.1.2.1.31.1.1.1.18"
-	
+
 	flag.Usage = func() {
 		fmt.Printf("Usage:\n")
 		fmt.Printf("   %s [-community=<community>] /n", filepath.Base(os.Args[0]))
-		fmt.Printf("     op5Masterip      - ip of the monitor server\n")
+		fmt.Printf("     op5MasterIP      - ip of the monitor server\n")
 		flag.PrintDefaults()
 	}
 
 	flag.StringVar(&snmpRun.community, "community", "public", "the community string for device")
-	flag.StringVar(&snmpRun.op5Masterip, "op5Masterip", "", "Ip address of Monitor Master IP")
+	flag.StringVar(&snmpRun.op5MasterIP, "op5MasterIP", "", "Ip address of Monitor Master IP")
 	flag.StringVar(&snmpRun.apiUsername, "apiUsername", "", "OP5 Username for api calls")
 	flag.StringVar(&snmpRun.apiPassword, "apiPassword", "", "Password for OP5 User")
 
@@ -80,11 +80,11 @@ func main() {
 	// Feeds community CLI flag to var
 	flag.Parse()
 
-	read, read_err := hostLoader("hosts.txt")
+	read, readErr := hostLoader("hosts.txt")
 
-	if read_err != nil {
+	if readErr != nil {
 		err := color.New(color.FgRed)
-		err.Println("read error, panicing...")
+		_, _ = err.Println("read error, panicking...")
 		os.Exit(1)
 	}
 
@@ -98,11 +98,10 @@ func main() {
 			gosnmp.Default.Timeout = time.Duration(5 * time.Second) // Timeout better suited to walking
 
 			err := gosnmp.Default.Connect()
-			defer gosnmp.Default.Conn.Close()
 
 			if err != nil {
-				err_red := color.New(color.FgRed)
-				err_red.Printf("Connect err: %v\n", err)
+				errRed := color.New(color.FgRed)
+				_, _ = errRed.Printf("Connect err: %v\n", err)
 				os.Exit(1)
 			}
 
@@ -111,13 +110,15 @@ func main() {
 			err = gosnmp.Default.BulkWalk(oid, printValue)
 
 			if err != nil {
-				err_red := color.New(color.FgRed)
-				err_red.Printf("Walk Error: %v\n", err)
+				errRed := color.New(color.FgRed)
+				_, _ = errRed.Printf("Walk Error: %v\n", err)
 				os.Exit(1)
-			}				
+			}
+
+			_ = gosnmp.Default.Conn.Close()
 		} else {
 			err := color.New(color.FgRed)
-			err.Println("Empty host, skipping...")
+			_, _ = err.Println("Empty host, skipping...")
 		}
 	}
 }
@@ -125,15 +126,15 @@ func main() {
 func printValue(pdu gosnmp.SnmpPDU) error {
 	switch pdu.Type {
 	case gosnmp.OctetString:
-		var if_num = strings.Split(pdu.Name, ".")
-		snmpRun.if_num_bit = if_num[len(if_num)-1]
+		var ifNum = strings.Split(pdu.Name, ".")
+		snmpRun.ifNumBit = ifNum[len(ifNum)-1]
 
-		var if_num_curl = "if_num " + string(snmpRun.if_num_bit)
-		snmpRun.snmp_port_alias = string(pdu.Value.([]byte))
-		snmpRun.if_num_curl = if_num_curl + "-" + snmpRun.snmp_port_alias		
+		var ifNumCurl = "if_num " + string(snmpRun.ifNumBit)
+		snmpRun.snmpPortAlias = string(pdu.Value.([]byte))
+		snmpRun.ifNumCurl = ifNumCurl + "-" + snmpRun.snmpPortAlias
 
 		if snmpRun.postCount <= 30 {
-			if snmpRun.snmp_port_alias != "" {
+			if snmpRun.snmpPortAlias != "" {
 				data := generatePayload(snmpRun, "traffic", "!80", "!90")
 				POST(snmpRun, data)
 				snmpRun.postCount++
@@ -145,7 +146,7 @@ func printValue(pdu gosnmp.SnmpPDU) error {
 				snmpRun.postCount++
 			} else {
 				err := color.New(color.FgRed)
-				err.Println("!Warning! alias was empty, continuing...")
+				_, _ = err.Println("!Warning! alias was empty, continuing...")
 			}
 		} else {
 			// Run commit...
@@ -165,25 +166,25 @@ func generatePayload(snmpBlock snmpData, checkCommand string, warn string, crit 
 
 	if checkCommand == "traffic" {
 		data = Payload{
-			HostName:			snmpBlock.hostname,
-			ServiceDescription: snmpBlock.if_num_curl + " traffic",
-			CheckCommandArgs:   snmpBlock.community + "!" + snmpRun.if_num_bit + warn + crit,
+			HostName:           snmpBlock.hostname,
+			ServiceDescription: snmpBlock.ifNumCurl + " traffic",
+			CheckCommandArgs:   snmpBlock.community + "!" + snmpRun.ifNumBit + warn + crit,
 			CheckCommand:       "check_traffic_bps_v2",
 			Template:           "default-service",
 		}
 	} else if checkCommand == "errors" {
 		data = Payload{
-			HostName:			snmpBlock.hostname,
-			ServiceDescription: snmpBlock.if_num_curl + " Interface Errors",
-			CheckCommandArgs:   snmpBlock.community + "!" + snmpRun.if_num_bit + warn + crit,
+			HostName:           snmpBlock.hostname,
+			ServiceDescription: snmpBlock.ifNumCurl + " Interface Errors",
+			CheckCommandArgs:   snmpBlock.community + "!" + snmpRun.ifNumBit + warn + crit,
 			CheckCommand:       "check_snmpif_errors_v2",
 			Template:           "default-service",
 		}
 	} else if checkCommand == "status" {
 		data = Payload{
-			HostName:			snmpBlock.hostname,
-			ServiceDescription: snmpBlock.if_num_curl + " Port Status",
-			CheckCommandArgs:   snmpBlock.community + "!" + snmpRun.if_num_bit + warn + crit,
+			HostName:           snmpBlock.hostname,
+			ServiceDescription: snmpBlock.ifNumCurl + " Port Status",
+			CheckCommandArgs:   snmpBlock.community + "!" + snmpRun.ifNumBit + warn + crit,
 			CheckCommand:       "check_snmpif_status_v2",
 			Template:           "default-service",
 		}
@@ -199,7 +200,7 @@ type op5API struct {
 }
 
 func findHostname(snmpBlock *snmpData) {
-	var apiURL = "https://" + snmpBlock.op5Masterip + "/api/filter/query?format=json&query=%5Bhosts%5D+address+%3D+%22" + string(gosnmp.Default.Target) + "%22&columns=name"
+	var apiURL = "https://" + snmpBlock.op5MasterIP + "/api/filter/query?format=json&query=%5Bhosts%5D+address+%3D+%22" + string(gosnmp.Default.Target) + "%22&columns=name"
 
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 
@@ -225,8 +226,6 @@ func findHostname(snmpBlock *snmpData) {
 	snmpBlock.hostname = hostAlias[0].Name
 }
 
-
-
 func POST(snmpBlock snmpData, payload Payload) {
 	// This disables HTTPS certificate validation
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
@@ -234,25 +233,25 @@ func POST(snmpBlock snmpData, payload Payload) {
 	time.Sleep(250 * time.Millisecond)
 
 	payloadBytes, err := json.Marshal(payload)
-	
+
 	if err != nil {
 		panic(err)
 	}
-	
+
 	fmt.Println(string(payloadBytes))
 
 	body := bytes.NewReader(payloadBytes)
-	
-	req, err := http.NewRequest("POST", "https://" + snmpBlock.op5Masterip + "/api/config/service", body)
-	
+
+	req, err := http.NewRequest("POST", "https://"+snmpBlock.op5MasterIP+"/api/config/service", body)
+
 	if snmpBlock.commit {
-		req, err = http.NewRequest("POST", "https://" + snmpBlock.op5Masterip + "/api/config/change", body)
+		req, err = http.NewRequest("POST", "https://"+snmpBlock.op5MasterIP+"/api/config/change", body)
 	}
-	
+
 	if err != nil {
 		panic(err)
 	}
-	
+
 	req.SetBasicAuth(snmpBlock.apiUsername, snmpBlock.apiPassword)
 	req.Header.Set("Content-Type", "application/json")
 
