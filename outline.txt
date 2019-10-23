@@ -6,3 +6,6 @@ find hosts' names
 get all interfaces of each host
 send each interface up individually to the API
 commit interface additions every 5-250 interfaces
+
+TODO: 
+Add logic that allows user to decide to mute alerts on ALL down physical ports, or just down physical ports that are not administratively down.
