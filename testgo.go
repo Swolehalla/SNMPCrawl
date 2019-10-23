@@ -72,7 +72,7 @@ func main() {
 
 	flag.StringVar(&snmpRun.community, "community", "public", "the community string for device")
 	flag.StringVar(&snmpRun.op5MasterIP, "op5MasterIP", "", "Ip address of Monitor Master IP")
-	flag.StringVar(&snmpRun.apiUsername, "apiUsername", "", "OP5 Username for api calls")
+	flag.StringVar(&snmpRun.apiUsername, "apiUsername", "administrator", "OP5 Username for api calls")
 	flag.StringVar(&snmpRun.apiPassword, "apiPassword", "", "Password for OP5 User")
 
 	// TODO Consider adding OPTIONAL flags for quiet and ignore empty alias
